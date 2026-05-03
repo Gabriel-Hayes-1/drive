@@ -21,7 +21,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const server = http.createServer(app)
 
-app.set('trust-proxy',1);
+app.set('trust proxy',1);
 
 const nonceStore = new Map();
 function removeExpiredNonces() {
