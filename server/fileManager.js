@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 const directory = path.resolve(import.meta.dirname, '../files');
-fs.mkdirSync(filesDir, { recursive: true })
+fs.mkdirSync(directory, { recursive: true })
 
 function getUserDir(username) {
     const userDir = path.join(directory, username);
