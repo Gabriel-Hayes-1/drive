@@ -136,6 +136,7 @@ app.post('/api/signup', signupLimiter, (req,res) => {
         if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
             res.status(400).json({ message: "Invalid_" });
         }
+        console.error("Error during signup: ", e);
     }
 })
 

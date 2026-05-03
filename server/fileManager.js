@@ -20,14 +20,9 @@ export function filePath(username, fileName) {
 }
 
 export function createUserDir(username) {
-    const userDir = getUserDir(username);
-    if (userDir) {
-        return userDir;
-    } else {
-        const newUserDir = path.join(directory, username);
-        fs.mkdirSync(newUserDir);
-        return newUserDir;
-    }
+    const userDir = path.join(directory, username);
+    fs.mkdirSync(userDir, { recursive: true }); // no-op if already exists
+    return userDir;
 }
 
 export async function deleteFile(username,fileName) {
