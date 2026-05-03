@@ -24,9 +24,10 @@ pass.addEventListener("keydown", (e) => {
     }
 })
 
-user.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-        pass.focus()
+pass.addEventListener("keydown",(e)=>{
+    if (e.key == "Tab") {
+        e.preventDefault();
+        user.focus();
     }
 })
 
@@ -88,10 +89,10 @@ user.addEventListener("input",()=>{
 
 document.addEventListener("keydown",(event)=>{
     if (event.key == "Enter") {
-        if (user.value!=="" && (!document.activeElement===pass)) {
-            pass.focus()
-        } else {
+        if (user.value==="") {
             user.focus();
+        } else {
+            pass.focus()
         }
     }
 })
@@ -111,6 +112,7 @@ async function submit(username, password) {
         user.value = "";
         pass.value = "";
         submitBtn.disabled = true;
+        user.focus()
     }
 }
 

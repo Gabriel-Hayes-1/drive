@@ -125,8 +125,7 @@ export async function unwrapPrivateKey(wrappedPrivateKey, authKey, iv) {
         return privateKey;
 
     } catch (e) {
-        console.error("Unwrapping failed:", e);
-        //login failed
+        return false;
     }   
 }
 
@@ -359,6 +358,10 @@ export async function login(username, password) {
 
 
     const unwrappedPrivateKey = await unwrapPrivateKey(base64ToArrayBuffer(encryptedPrivateKey), authKey, base64ToArrayBuffer(iv));
+
+    if (!unwrappedPrivateKey) {
+        return {success:false, message: "invalid password"};
+    }
 
     const nonceBytes = base64ToArrayBuffer(nonce);
     const signedNonce = arrayBufferToBase64(await signNonce(nonceBytes, unwrappedPrivateKey));
