@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Drive</title>
+    <link rel="stylesheet" href="/assets/global.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/hard-drive.svg">
+</head>
+
+<body>
+    <div class="app">
+        <div id="dropElem" class="transparent">
+            Drop Files Here
+        </div>
+        <aside class="sidebar">
+            <div class="section top">
+                <label for="file-uploader" id="upload" class="sidebar-button">Upload File</label>
+                <input type="file" id="file-uploader" multiple>
+                <button class="sidebar-button" id="create-folder">Create Folder</button>
+                <hr>
+                <div id="upload-section" class="transparent">
+                    <p>Uploading <span id="uploaded-count">0</span>/<span id="total-count">0</span> files...</p>
+                    <div class="progress-bar">
+                        <div class="progress" id="upload-progress" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="section bottom">
+                <div id="storage-limit">
+                    <p>Used <span id="used-space">0</span> of 20 GB</p>
+                    <div class="progress-bar">
+                        <div id="storage-limit-progress" class="progress" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <hr>
+                <button class="link-button" id="logout">Log Out</button>
+                <div class="horizontal-container">
+                    <button id="export" class="link-button">Export Data</button>
+                    <button id="delete" class="link-button">Delete Account</button>
+                </div>  
+            </div>
+        </aside>
+        <div class="main">
+            <div id="search-row">
+                <div class="icon" id="search-icon"></div>
+                <input type="text" id="search" autocomplete="off" placeholder="">
+            </div>
+            <div id="path-row">
+                <button class="link-button" id="folder-root">/</button>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <colgroup>
+                        <col class="col-name">
+                        <col class="col-modified">
+                        <col class="col-type">
+                        <col class="col-size">
+                        <col class="col-actions">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th style="padding-left: 36px;">Name</th>
+                            <th>Modified</th>
+                            <th>Type</th>
+                            <th>Size</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="file-list">
+
+                    </tbody>
+                </table>
+            </div>
+            
+
+            <template id="file">
+                <tr>
+                    <td class="col-name-cell">
+                        <div class="file-icon"></div>
+                        <input type="text" class="col-file-name" spellcheck="false" name="shutupchrome">
+
+                    </td>
+                    <td class="col-date-cell">May 25, 2025</td>
+                    <td class="col-type-cell">txt</td>
+                    <td class="col-size-cell">0 bytes</td>
+                    <td>
+                        <button class="table-action-btn btn-download"></button>
+                        <button class="table-action-btn btn-delete"></button>
+                    </td>
+                </tr>
+            </template>
+        </div>
+
+        <div id="preview-wrapper" class="transparent">
+            <div class="preview-title">
+                <span id="preview-name">File Name</span>
+                <div id="close-preview"></div>
+            </div>
+            <div id="file-preview"></div>
+
+            
+        </div>
+        
+    </div>
+
+    <script src="main.js" type="module"></script>
+</body>
+
+</html>

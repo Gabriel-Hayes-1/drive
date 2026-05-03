@@ -1,0 +1,92 @@
+@font-face {
+    font-family: Jetbrains;
+    src: url("JetBrains\ Mono\ Regular.woff2");
+}
+
+@font-face {
+    font-family: Lora;
+    src: url("Lora\ Regular.woff2");
+}
+
+:root {
+    --primary: rgb(180, 40, 30);
+    --secondary: rgb(66, 45, 42);
+    --dark: rgb(48, 32, 29);
+    --text: rgb(20, 16, 16);
+    --light: rgb(170, 135, 135);
+}
+
+.html,
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--text);
+    color: white;
+    font-family: Lora;
+}
+
+.app {
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(circle at bottom, rgba(180, 40, 30, 0.134) 0%, transparent 100%);
+}
+
+.bottom-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    position: absolute;
+    bottom: 20px;
+}
+
+a {
+    color: var(--secondary);
+    text-decoration: none;
+    font-family: "Lora";
+    transition: color 0.2s;
+    font-size: 12px;
+    text-align: center;
+}
+
+a:hover {
+    color: var(--primary);
+}
+
+.subtle {
+    color: var(--secondary);
+    font-family: lora;
+    font-size: 12px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.transparent {
+    opacity: 0;
+    pointer-events: none;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--secondary);
+    width: 100%;
+}
+
+p {
+    color: var(--secondary);
+    font-family: lora;
+    font-size: 13px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--dark);
+    border-radius: 5px;
+}

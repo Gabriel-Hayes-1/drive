@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Claim your Drive</title>
+    <link rel="stylesheet" href="/assets/global.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="/assets/hard-drive.svg">
+</head>
+
+<body>
+    <div class="app">
+        <!-- USERNAME SECTION -->
+        <div id="username-section" class="app-section">
+            <h1>Choose a username</h1>
+            <div class="field-row">
+                <div class="input-row focused" id="username-row">
+                    <input class="password" id="username" type="text" placeholder="username" autocomplete="username" autofocus>
+                </div>
+                <button class="submit-btn" id="username-submit" disabled>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    
+        <!-- PASSWORD SECTION -->
+        <div id="password-section" class="app-section transparent">
+            <h1>Choose a password</h1>
+            <div class="field-row">
+                <div class="input-row" id="password-row">
+                    <input class="password" id="password" type="password" placeholder="password"
+                        autocomplete="off">
+                    <button class="password-icon visibility" id="visibility"></button>
+                </div>
+                <button class="submit-btn" id="submit" disabled>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
+                    </svg>
+                </button>
+            </div>
+            <h2><span id="charcount" class="invalid">0/20</span> characters</h2>
+            <button id="password-back">&lt; back</button> 
+        </div>
+    </div>
+    <div class="bottom-row">
+        <a href="/access">Already have access?</a>
+    </div>
+    <div class="popup-container transparent" id="popup">
+        <div class="popup">
+            <div id="icon"></div>
+            <h1>Before you continue</h1>
+            <p>This is a <span class='highlight'>zero-knowledge</span> system. Your password is the only key to your data. 
+                There are no emails, no reset links, and no way to change your password. <br><br>
+                If you lose your password, your data is <span class="highlight">permanently unrecoverable.</span>
+            </p>
+            <hr>
+            <a class="download-link" id="download" download="Drive-Password.txt">Download key file</a>
+            <div class="checkbox-row">
+                <input type="checkbox" name="ackCheck" id="ackCheck">
+                <label for="ackCheck">I understand that if I lose my password, my data will be permanently unrecoverable.</label>
+            </div>
+            <hr>
+            <div class="password-confirm-row">
+                <p>Enter your password again to confirm you've remembered it: </p>
+                <div class="input-row" id="">
+                    <input class="password" id="confirm-password" type="password" placeholder="password" autocomplete="current-password">
+                    <img class="password-icon transparent" id="password-check" alt="">
+                    <button class="password-icon visibility" id="confirm-visibility"></button>
+                </div>
+            </div>
+            
+            <button class="button" id="continue" disabled >Confirm</button>
+            <button class="button" id="back">Go back</button>
+        </div>
+    </div>
+    
+
+    <script src="signup.js" type="module"></script>
+</body>
+
+</html>
