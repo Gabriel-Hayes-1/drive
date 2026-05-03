@@ -125,7 +125,7 @@ app.post('/api/signup', signupLimiter, (req,res) => {
         db.prepare("INSERT INTO users (id, encryptedPrivateKey, publicKey, salt, iv) VALUES (?, ?, ?, ?, ?)")
             .run(username, encryptedPrivateKey, publicKey, salt, iv);
 
-        if (env.NODE_ENV!=="development") {
+        if (process.env.NODE_ENV!=="development") {
             db.prepare("DELETE FROM invites WHERE code = ?").run(signupCode);
         }
 
