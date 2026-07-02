@@ -122,17 +122,28 @@ export async function getFiles() {
     );
 
     const fileMap = new Map();
-    results.filter(result => result.status === "fulfilled").forEach(result => {
-        const metadata = result.value;
-        fileMap.set(metadata.fileId, metadata);
-    });
-    const failedFiles = results.filter(result => result.status === "rejected");
+    const confirmedMissing = [];  // 404s only
 
-    if (failedFiles.length > 0) {
-        console.warn(`Failed to fetch ${failedFiles.length} files`);
+    results.forEach((result, i) => {
+        if (result.status === "fulfilled") {
+            const metadata = result.value;
+            fileMap.set(metadata.fileId, metadata);
+        } else if (result.reason === 404) {
+            confirmedMissing.push(manifest[i]);  // safe to prune
+        } else {
+            console.warn("Failed to fetch file (keeping in manifest):", result.reason);
+        }
+    });
+
+    if (confirmedMissing.length > 0) {
+        console.log(`Pruning ${confirmedMissing.length} missing manifest entries`);
+        const prunedManifest = manifest.filter(id => !confirmedMissing.includes(id));
+        updateManifest(prunedManifest, keys.manifestKey, keys.hmacSecret);  // fire and forget
     }
+
     return fileMap;
 }
+
 
 async function getFileEntry(fileId) {
     if (!keys) {
@@ -254,10 +265,71 @@ export async function deleteFolder(folderId) {
     }
 }
 
-export async function getFileContent(metadata) {
-    const encryptedContent = await getFile(metadata.contentName);
+export async function getFileContent(metadata, progressCallback) {
+    if (await fileExistsDB(metadata.fileId)) {
+        const cachedFile = await readFileDB(metadata.fileId);
+        if (cachedFile) return cachedFile;
+    }
+    const encryptedContent = await getFile(metadata.contentName,({percent})=>{
+        progressCallback?.(percent);
+    });
     const decryptedContent = await decrypt(metadata.contentKey, encryptedContent);
-    return new Blob([decryptedContent], { type: metadata.type });
+    const blob = new Blob([decryptedContent], { type: metadata.type });
+    await writeFileDB(metadata.fileId, blob);
+    return blob
 }
 
 
+
+
+//indexedDB local cache 
+//--------------------------------------------------------------
+const DB_NAME = "drive-cache";
+const DB_VERSION = 1;
+const STORE_NAME = "files";
+
+async function openDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+        req.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: "fileId" });
+            }
+        };
+
+        req.onsuccess = (event) => resolve(event.target.result);
+        req.onerror = (event) => reject(event.target.error);
+    })
+}
+
+async function writeFileDB(fileId, content) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME).put({ fileId, content });
+        store.onsuccess = () => resolve();
+        store.onerror = (e) => reject(e.target.error);
+    })
+}
+
+async function readFileDB(fileId) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const req = tx.objectStore(STORE_NAME).get(fileId);
+        req.onsuccess = (e) => resolve(req.result.content ?? null);
+        req.onerror = (e) => reject(req.error);
+    });
+}
+
+async function fileExistsDB(fileId) {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).getKey(fileId);
+        req.onsuccess = () => resolve(req.result !== undefined);
+        req.onerror = () => reject(req.error);
+    });
+}

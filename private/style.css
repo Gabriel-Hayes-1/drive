@@ -237,6 +237,14 @@
     font-family: jetbrains;
 }
 
+#path-row .link-button.current {
+    cursor: default;
+}
+
+#path-row .link-button.current:hover {
+    color: var(--secondary);
+}
+
 .table-wrapper {
     margin: 30px 50px 0;
     overflow-y: auto;
@@ -445,6 +453,24 @@ tbody tr:hover .file-icon {
     height: auto;
     object-fit: contain;
     display: block;
+}
+
+#preview-load-progress {
+    height: 10px;
+    width: 200px;
+    display: flex;
+    border-radius: 5px;
+    overflow: hidden;
+    background-color: var(--dark);
+}
+.progress-bar {
+    height:100%;
+    width:0;
+    background-color: var(--primary);
+}
+
+#file-not-supported p {
+    font-size: 16px;
 }
 
 .preview-title {

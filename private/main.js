@@ -94,6 +94,7 @@ searchBar.addEventListener("input",()=>{
 let path = [];
 const pathRow = document.querySelector("#path-row");
 const rootDir = document.querySelector("#folder-root");
+document.addEventListener("keydown",(e)=>{if (e.key=="p") console.log(path)})
 rootDir.addEventListener("click",()=>{
     path = [];
     redrawFileList();
@@ -107,18 +108,22 @@ function navigateToFolder(folderId, folderName) {
     const pathButton = document.createElement("button");
     pathButton.textContent = folderName;
     pathButton.classList.add("link-button");
-    pathButton.addEventListener("click",()=>{
+    pathButton.addEventListener("click", () => {
         const index = path.indexOf(folderId);
         if (index !== -1) {
-            path = path.slice(0,index+1);
+            path = path.slice(0, index + 1);
             redrawFileList();
-            //remove path buttons
-            while (pathRow.children.length > index+1) {
+            // pathRow has an extra "root" button at index 0,
+            // so the target length is index + 2, not index + 1
+            while (pathRow.children.length > index + 2) {
                 pathRow.removeChild(pathRow.lastChild);
             }
-            navigateToFolder(folderId, folderName);
+            document.querySelectorAll('.link-button.current').forEach(e=>e.classList.remove('current'))
+            pathButton.classList.add('current')
         }
     })
+    document.querySelectorAll('.link-button.current').forEach(e=>e.classList.remove('current'))
+    pathButton.classList.add('current')
     pathRow.appendChild(pathButton);
 }
 function fileInWorkingDir(file) {
@@ -138,6 +143,8 @@ window.getWorkingDir = getWorkingDir;
 //display files 
 const fileTemplate = document.querySelector("#file");
 const fileList = document.querySelector("#file-list");
+let filesInView = [];
+let previewFileIndex;
 const supportedTypes = ["image", "video", "audio", "text", "application", "folder"];
 function sortFiles(files, sortBy) {
     const fileArray = files instanceof Map ? Array.from(files.values()) : [...files];
@@ -234,17 +241,7 @@ async function displayFile(file) {
         fileFragment.querySelector(".btn-download").classList.add("hidden")
     } else {
         fileFragment.querySelector(".btn-download").addEventListener("click", async () => {
-            let blob;
-            if (mostRecentBlob && mostRecentBlob.fileId === file.fileId) {
-                blob = mostRecentBlob.blob;
-            } else {
-                blob = await getFileContent(file);
-                mostRecentBlob = {
-                    fileId: file.fileId,
-                    blob
-                }
-            }
-            const url = URL.createObjectURL(blob);
+            const url = await createBlobURL(file);
             const a = document.createElement("a");
             a.href = url;
             a.download = file.name;
@@ -254,11 +251,13 @@ async function displayFile(file) {
             URL.revokeObjectURL(url);
         });
     }
-    fileFragment.querySelector(".btn-delete").addEventListener("click", async () => {
-        // ADD SOME CONFIRMATION HERE
+    fileFragment.querySelector(".btn-delete").addEventListener("click", async (e) => {
+        if (!e.shiftKey) {
+            //confirmation 
+        }
         let success;
         if (file.type === "folder") {
-            if (0=== 0) {
+            if (0 === 0) {
                 success = await deleteFolder(file.fileId);
             }
         } else {
@@ -274,37 +273,41 @@ async function displayFile(file) {
             navigateToFolder(file.fileId, file.name);
             redrawFileList();
         } else {
-            //get blob
-            let blob; 
-            if (mostRecentBlob && mostRecentBlob.fileId === file.fileId) {
-                blob = mostRecentBlob.blob;
-            } else {
-                blob = await getFileContent(file);
-                mostRecentBlob = {
-                    fileId: file.fileId,
-                    blob
-                }
-            }
-            const url = URL.createObjectURL(blob);
-            const previewElement = createPreviewElement(file.type, url);
-            if (previewElement) {
-                openFilePreview(previewElement, file.name);
-            }
-
+            openPreviewFor(file)
         }
     })
 
 
     fileList.appendChild(fileFragment);
 }
+document.addEventListener("keydown", async (e)=>{
+    if (previewFileIndex == null || !filesInView[previewFileIndex]) return;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        const nextFile = filesInView[previewFileIndex+1]
+        if (nextFile) {
+            openPreviewFor(nextFile)
+        }
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        const prevFile = filesInView[previewFileIndex-1]
+        if (prevFile) {
+            openPreviewFor(prevFile)
+        }
+    }
+})
+
+
 const files = await getFiles();
 function redrawFileList() {
     fileList.innerHTML = ''
     
+    filesInView = []
     const sortedFiles = sortFiles(files, "name");
     for (const file of sortedFiles) {
         if (passesSearch(file) && fileInWorkingDir(file)) {
             displayFile(file);
+            if (file.type !== "folder") {
+                filesInView.push(file);
+            }
         }
     }
 }
@@ -325,6 +328,26 @@ createFolder.addEventListener("click", async () => {
 
 
 //file previews
+async function openPreviewFor(file) {
+    if (file.type == "folder") return;
+    openFilePreview(file.name);
+    if (isFileDisplayable(file)) {
+        typeNotSupported.classList.add("hidden");
+        const url = await createBlobURL(file, true);
+        fillFilePreview(file.type, url);
+    } else {
+        typeNotSupported.classList.remove("hidden");
+    }
+
+    const index = filesInView.findIndex(f => f.fileId === file.fileId);
+    previewFileIndex = index===-1?null:index;
+}
+function isFileDisplayable(metadata) {
+    //Are we able to display the file type in the browser? If not, dont bother downloading
+    const displayableTypes = supportedTypes.filter(type => !["application", "folder"].includes(type));
+    const fileType = metadata.type.split('/')[0];
+    return displayableTypes.includes(fileType);
+}
 function createPreviewElement(type, url) {
     let previewElement;
     if (type.startsWith("image/")) {
@@ -348,24 +371,58 @@ const previewWrapper = document.querySelector("#preview-wrapper");
 const filePreview = document.querySelector("#file-preview");
 const filePreviewName = document.querySelector("#preview-name");
 const previewClose = document.querySelector("#close-preview");
-function openFilePreview(previewElement, name) {
+const previewLoadProgress = document.querySelector("#preview-load-progress");
+const previewLoadBar = previewLoadProgress.querySelector(".progress-bar");
+const typeNotSupported = document.querySelector("#file-not-supported");
+function openFilePreview(name) {
     previewWrapper.classList.remove("transparent");
-    filePreview.innerHTML = '';
-    filePreview.appendChild(previewElement);
     filePreviewName.textContent = name;
+    filePreview.innerHTML = '';
+}
+function fillFilePreview(type,url) {
+    filePreview.innerHTML = '';
+    const previewElement = createPreviewElement(type, url);
+    if (previewElement) {
+        filePreview.appendChild(previewElement);
+    } else {
+        typeNotSupported.classList.remove("hidden");
+    }
+}
+async function createBlobURL(file, isPreview) {
+    let blob;
+    if (mostRecentBlob && mostRecentBlob.fileId === file.fileId) {
+        blob = mostRecentBlob.blob;
+    } else {
+        if (isPreview) previewLoadProgress.classList.remove("hidden");
+        blob = await getFileContent(file, (percentage)=>{
+            if (isPreview) {
+                previewLoadBar.style.width = percentage + "%";
+            }
+        });
+        previewLoadProgress.classList.add("hidden");
+        mostRecentBlob = {
+            fileId: file.fileId,
+            blob
+        }
+    }
+    return URL.createObjectURL(blob);
+}
+function closePreview() {
+    previewWrapper.classList.add("transparent");
+    previewFileIndex = null;
 }
 previewClose.addEventListener("click",()=>{
-    previewWrapper.classList.add("transparent");
+    closePreview();
 })
 previewWrapper.addEventListener("click",(e)=>{
     if (e.target === previewWrapper) {
-        previewWrapper.classList.add("transparent");
+        closePreview();
     }
 });
 document.addEventListener('keydown',(e)=>{
     if (e.key === "Escape") {
         if (!previewWrapper.classList.contains("transparent")) {
-            previewWrapper.classList.add("transparent");
+            closePreview();
         }
     }
 })

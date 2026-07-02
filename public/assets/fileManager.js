@@ -40,41 +40,46 @@ export async function uploadFile(name, content, onProgress) {
         xhr.send(content);
     });
 }
-window.uploadFile = uploadFile;
 
-export async function getFile(fileName) {
-    try {
-        const response = await fetch("/api/file/" + encodeURIComponent(fileName));
+export async function getFile(fileName, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.responseType = "arraybuffer";
 
-        if (!response.ok) {
-            const resJson = await response.json();
-            const message = resJson.message || "Failed to fetch file";
-            console.error(message);
-            return;
+        if (onProgress) {
+            xhr.addEventListener("progress", (event) => {
+                if (event.lengthComputable) {
+                    onProgress({
+                        loaded: event.loaded,
+                        total: event.total,
+                        percent: Math.round((event.loaded / event.total) * 100)
+                    });
+                }
+            });
         }
 
-        const reader = response.body.getReader();
-        const chunks = [];
-        let receivedLength = 0;
+        xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                resolve(xhr.response);
+            } else if (xhr.status === 404) {
+                reject(404);
+            } else {
+                try {
+                    const { message } = JSON.parse(new TextDecoder().decode(xhr.response));
+                    reject(new Error(message || `Server error ${xhr.status}`));
+                } catch {
+                    reject(new Error(`Server error ${xhr.status}`));
+                }
+            }
+        });
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-            receivedLength += value.length;
-        }
+        xhr.addEventListener("error", (e) => {
+            reject(new Error(`Connection error: ${e}`));
+        });
 
-        let allBytes = new Uint8Array(receivedLength);
-        let position = 0;
-        for (let chunk of chunks) {
-            allBytes.set(chunk, position);
-            position += chunk.length;
-        }
-        
-        return allBytes.buffer;
-    } catch (e) {
-        console.error("Error fetching file ", e);
-    }
+        xhr.open("GET", "/api/file/" + encodeURIComponent(fileName));
+        xhr.send();
+    });
 }
 
 export async function deleteFileRaw(fileName) {
@@ -100,29 +105,36 @@ export async function getManifest(hmacSecret, manifestKey) {
     const storedUsername = localStorage.getItem("username"); //username we're logged into
     const storedManifestUsername = localStorage.getItem("manifestUsername");
 
-    const storedManifest = localStorage.getItem("manifest");
+    const storedManifest = sessionStorage.getItem("manifest");
     if (storedManifest && storedUsername && storedUsername===storedManifestUsername) {
         return JSON.parse(storedManifest);
     }
 
     //try to fetch
-    
+
     const manifestName = await deriveManifestName(hmacSecret);
-    const fetchedManifest = await getFile(manifestName);
-    if (fetchedManifest) {
-        const decryptedManifest = await decrypt(manifestKey,fetchedManifest);
-        const manifestJson = JSON.parse(new TextDecoder().decode(decryptedManifest));
-        localStorage.setItem("manifest", JSON.stringify(manifestJson));
-        localStorage.setItem("manifestUsername", storedUsername);
-        return manifestJson;
+    try {
+        const fetchedManifest = await getFile(manifestName);
+        if (fetchedManifest) {
+            const decryptedManifest = await decrypt(manifestKey,fetchedManifest);
+            const manifestJson = JSON.parse(new TextDecoder().decode(decryptedManifest));
+            sessionStorage.setItem("manifest", JSON.stringify(manifestJson));
+            localStorage.setItem("manifestUsername", storedUsername);
+            return manifestJson;
+        }
+    } catch (e) {
+        if (e === 404) {
+            console.log("Manifest not found on server, creating a new one");
+        }
     }
+    
 
     //nothing on server, create a new one
     const newManifest = [];
     const newFile = await encrypt(manifestKey, new TextEncoder().encode(JSON.stringify(newManifest)));
     const result = await uploadFile(manifestName, newFile);
     if (result) {
-        localStorage.setItem("manifest", JSON.stringify(newManifest));
+        sessionStorage.setItem("manifest", JSON.stringify(newManifest));
         localStorage.setItem("manifestUsername", storedUsername);
         return newManifest;
     } else {
@@ -132,7 +144,7 @@ export async function getManifest(hmacSecret, manifestKey) {
 }
 
 export async function updateManifest(manifest, manifestKey, hmacSecret) {
-    localStorage.setItem("manifest", JSON.stringify(manifest));
+    sessionStorage.setItem("manifest", JSON.stringify(manifest));
     const manifestName = await deriveManifestName(hmacSecret);
     const encryptedManifest = await encrypt(manifestKey, new TextEncoder().encode(JSON.stringify(manifest)));
     const result = await uploadFile(manifestName, encryptedManifest);

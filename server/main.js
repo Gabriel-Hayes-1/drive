@@ -16,12 +16,14 @@ const CODE_EXPIRE_TIME = 24 * 7 //in hours
 
 dotenv.config({quiet: true})
 
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const server = http.createServer(app)
 
 app.set('trust proxy',1);
+app.disable('x-powered-by');
 
 const nonceStore = new Map();
 function removeExpiredNonces() {
@@ -134,9 +136,10 @@ app.post('/api/signup', signupLimiter, (req,res) => {
         res.json({ success: true });
     } catch (e) {
         if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            res.status(400).json({ message: "Invalid_" });
+            return res.status(400).json({ message: "Invalid_" });
         }
         console.error("Error during signup: ", e);
+        res.status(500).json({ message: "Internal server error" });
     }
 })
 
@@ -330,11 +333,10 @@ app.get('/api/file/:file', requireAuth, (req,res) => {
     const path = filePath(userId, file);
     if (!fs.existsSync(path)) return res.status(404).json({message: "File not found"});
     
-    //pipe the file contents 
+    const { size } = fs.statSync(path);
+    res.setHeader("Content-Length", size);
     const readStream = fs.createReadStream(path);
-
     readStream.pipe(res);
-
 
     readStream.on('error', err => {
         console.error("Error reading file:", err);

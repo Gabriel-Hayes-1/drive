@@ -47,7 +47,7 @@
                 <input type="text" id="search" autocomplete="off" placeholder="">
             </div>
             <div id="path-row">
-                <button class="link-button" id="folder-root">/</button>
+                <button class="link-button current" id="folder-root">/</button>
             </div>
 
             <div class="table-wrapper">
@@ -79,7 +79,7 @@
                 <tr>
                     <td class="col-name-cell">
                         <div class="file-icon"></div>
-                        <input type="text" class="col-file-name" spellcheck="false" name="shutupchrome">
+                        <input type="text" class="col-file-name" spellcheck="false" name="a" autocomplete="off">
 
                     </td>
                     <td class="col-date-cell">May 25, 2025</td>
@@ -99,8 +99,12 @@
                 <div id="close-preview"></div>
             </div>
             <div id="file-preview"></div>
-
-            
+            <div id="preview-load-progress" class="hidden">
+                <div class="progress-bar" style="width: 0%;"></div>
+            </div>
+            <div id="file-not-supported" class="">
+                <p>File type not supported for preview.</p>
+            </div>
         </div>
         
     </div>
