@@ -12,7 +12,7 @@ db.exec(`
         encryptedPrivateKey TEXT NOT NULL,
         publicKey TEXT NOT NULL,
         salt TEXT NOT NULL,
-        iv TEXT NOT NULL UNIQUE 
+        iv TEXT NOT NULL 
     );
 
     CREATE TABLE IF NOT EXISTS invites (

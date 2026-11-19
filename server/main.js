@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import db from './db.js';
-import {filePath, createUserDir, deleteFile} from './fileManager.js';
+import {filePath, createUserDir, deleteFile, isFileNameValid} from './fileManager.js';
 import fs from 'fs';
 
 const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1GB
@@ -60,7 +60,7 @@ function requireAuth(req, res, next) {
 
 const signupLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: process.NODE_ENV === 'production' ? 10 : 10000,
+    max: process.env.NODE_ENV === 'production' ? 10 : 10000,
     message: {message: "Too many attempts, please try again later."}
 })
 
@@ -118,6 +118,11 @@ app.post('/api/signup', signupLimiter, (req,res) => {
 
     if (!isValidSignupCode(signupCode)) return res.status(400).json({message: "invalid or expired invite code" });
 
+    const USERNAME_RE = /^[a-zA-Z0-9_-]{3,32}$/;
+    if (typeof username !== 'string' || !USERNAME_RE.test(username)) {
+        return res.status(400).json({ message: "Invalid username" });
+    }
+
     //check if db contains username already 
     const existingUser = db.prepare("SELECT * FROM users WHERE id = ?").get(username);
     if (existingUser) return res.status(400).json({message: "user already exists"});
@@ -136,7 +141,7 @@ app.post('/api/signup', signupLimiter, (req,res) => {
         res.json({ success: true });
     } catch (e) {
         if (e.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-            return res.status(400).json({ message: "Invalid_" });
+            return res.status(400).json({ message: "Error" });
         }
         console.error("Error during signup: ", e);
         res.status(500).json({ message: "Internal server error" });
@@ -183,27 +188,27 @@ app.post('/api/nonce', async (req,res)=>{
     const {username, signedNonce} = req.body;
 
     if (!username || !signedNonce) {
-        res.status(400).json({message: "Username and signedNonce are required"});
+        return res.status(400).json({message: "Username and signedNonce are required"});
     }
 
     const nonceData = nonceStore.get(username);
     
     if (!nonceData) {
-        res.status(400).json({message: "Invalid username or nonce"});
+        return res.status(400).json({message: "Invalid username or nonce"});
     }
 
     const {nonce, expiry} = nonceData;
 
     if (Date.now() > expiry) {
         nonceStore.delete(username);
-        res.status(400).json({message: "Nonce expired"});
+        return res.status(400).json({message: "Nonce expired"});
     }
 
     const stmt = db.prepare("SELECT * FROM users WHERE id = ?");
     const user = stmt.get(username);
     
     if (!user) {
-        res.status(400).json({message: "Invalid username or nonce"});
+        return res.status(400).json({message: "Invalid username or nonce"});
     }
     
     const publicKeyBytes = Buffer.from(user.publicKey, 'base64');
@@ -255,7 +260,9 @@ app.put('/api/upload', requireAuth, (req,res) => {
     const name = req.headers['file-name'];
     if (!name) return res.status(400).json({message: "File-Name header is required"});
 
-    const fileStream = fs.createWriteStream(filePath(userId, name));
+    const path = filePath(userId, name)
+    if (path == null) return res.status(400).json({message: "Invalid file name"});
+    const fileStream = fs.createWriteStream(path);
     let bytesReceived = 0;
 
     req.on('data', chunk => {
@@ -275,6 +282,14 @@ app.put('/api/upload', requireAuth, (req,res) => {
         res.json({message: "File uploaded successfully"});
     })
 
+    fileStream.on('error', err => {
+        //clean up partial file
+        deleteFile(userId, name).catch(e => console.error("Error deleting file after write error:", e));
+        if (!res.headersSent) {
+            res.status(500).json({message: "File upload failed"});
+        }
+    })
+
     req.on('error', err => {
         if (!res.headersSent) {
             res.status(500).json({message: "File upload failed"});
@@ -292,7 +307,7 @@ app.post('/api/file/batch', requireAuth, async (req,res) => {
     let totalBuffer = Buffer.alloc(4);
     totalBuffer.writeInt32BE(fileNum);
     for (const name of files) {
-        if (typeof name !== 'string' || name.length > 255) {
+        if (typeof name !== 'string' || !isFileNameValid(name)) {
             return res.status(400).json({message: "Invalid file name in batch"});
         }
         
@@ -302,12 +317,11 @@ app.post('/api/file/batch', requireAuth, async (req,res) => {
         if (!fs.existsSync(path)) {
             dataLength = -1;
         } else {
-            fileData = fs.readFileSync(path);
-            dataLength = fileData.length;
-            if (dataLength > 32767) {
+            if (fs.statSync(path).size > 32767) {
                 return res.status(400).json({message: `File ${name} exceeds max size of 32KB`, name});
             }
-
+            fileData = fs.readFileSync(path);
+            dataLength = fileData.length;
         }
         const header = Buffer.alloc(2);
         header.writeInt16BE(dataLength);
@@ -331,7 +345,7 @@ app.get('/api/file/:file', requireAuth, (req,res) => {
     if (!file) return res.status(400).json({message: "FilePath is required"});
 
     const path = filePath(userId, file);
-    if (!fs.existsSync(path)) return res.status(404).json({message: "File not found"});
+    if (!path || !fs.existsSync(path)) return res.status(404).json({message: "File not found"});
     
     const { size } = fs.statSync(path);
     res.setHeader("Content-Length", size);
