@@ -432,6 +432,14 @@ document.addEventListener('keydown',(e)=>{
 //log out
 const logout = document.querySelector("#logout");
 logout.addEventListener("click", async ()=>{
+    //clear localStorage and indexedDB
+    localStorage.clear()
+    sessionStorage.clear()
+    indexedDB.databases().then((dbs) => {
+        for (const db of dbs) {
+            indexedDB.deleteDatabase(db.name);
+        }
+    })
     const logoutResult = await fetch("/api/logout",{
         method: "POST"
     })
