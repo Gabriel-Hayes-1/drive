@@ -1,4 +1,4 @@
-import { uploadFile, getFile, deleteFileRaw, getManifest, updateManifest } from "/assets/fileManager.js";
+import { uploadFile, getFile, deleteFileRaw, getManifest, updateManifest, getFileBatch } from "/assets/fileManager.js";
 import {
     deriveFileNames, base64ToKey, base64ToArrayBuffer,
     arrayBufferToHex, encrypt, decrypt, deriveFileKeys, arrayBufferToBase64
@@ -106,24 +106,58 @@ export async function getFiles() {
     }
     const manifest = await getManifest(keys.hmacSecret, keys.manifestKey);
 
-    const results = await Promise.allSettled(
+    const fileInfo = await Promise.all(
         manifest.map(async (base64FileId) => {
+            //getting file names
             const fileId = base64ToArrayBuffer(base64FileId);
-            const { metadataName, contentName } = await deriveFileNames(keys.hmacSecret, fileId);
-            const { metaKey, contentKey } = await deriveFileKeys(keys.masterBits, fileId, keys.salt);
-            const encryptedMeta = await getFile(metadataName);
-            const fileBytes = await decrypt(metaKey, encryptedMeta);
-            const metadata = JSON.parse(new TextDecoder().decode(fileBytes));
-            metadata.contentName = contentName;
-            metadata.contentKey = contentKey;
-            metadata.fileId = base64FileId;
-            return metadata;
+            const names = await deriveFileNames(keys.hmacSecret, fileId);
+            const fileKeys = await deriveFileKeys(keys.masterBits, fileId, keys.salt);
+            // const { metadataName, contentName } = await deriveFileNames(keys.hmacSecret, fileId);
+            // const { metaKey, contentKey } = await deriveFileKeys(keys.masterBits, fileId, keys.salt);
+            return {base64FileId, ...names,...fileKeys}
         })
     );
 
+    const fileBlobs = await getFileBatch(fileInfo.map(e=>e.metadataName));
+    if (fileBlobs === false) {
+        //big bad error
+        throw new Error("Batch get failed, you dont have network connection and this is prob more common than i want to believe and idk how to deal with this.")
+    }
+    for (let blobIndex=0; blobIndex<fileBlobs.length; blobIndex++) {
+        const fileBlob = fileBlobs[blobIndex]
+        const bytes = new Uint8Array(fileBlob);
+        const view = new DataView(fileBlob);
+        const count = view.getInt32(0,false);
+        let index = 4; //start on 4th byte due to first 4 bytes for amount of items
+        for (let i=0;i<count;i++) {
+            const byteLength = view.getInt16(index,false);
+            index+=2;
+            if (byteLength === -1) {
+                fileInfo[blobIndex*100+i].encryptedMetadata = null;
+            } else {
+                fileInfo[blobIndex*100+i].encryptedMetadata = bytes.slice(index, index+byteLength);
+                index += byteLength;
+            }
+        }
+    }
+
+    const results = await Promise.allSettled(
+        fileInfo.map(async (file)=>{
+            if (!file.encryptedMetadata) throw 404;
+            const metadataBytes = await decrypt(file.metaKey, file.encryptedMetadata);
+            const metadata = JSON.parse(new TextDecoder().decode(metadataBytes));
+            metadata.contentName = file.contentName
+            metadata.contentKey = file.contentKey
+            metadata.fileId = file.base64FileId
+            return metadata
+        })
+    )
+    
+    
     const fileMap = new Map();
     const confirmedMissing = [];  // 404s only
 
+    //pruning / fileMap filling
     results.forEach((result, i) => {
         if (result.status === "fulfilled") {
             const metadata = result.value;
@@ -134,9 +168,7 @@ export async function getFiles() {
             console.warn("Failed to fetch file (keeping in manifest):", result.reason);
         }
     });
-
     if (confirmedMissing.length > 0) {
-        console.log(`Pruning ${confirmedMissing.length} missing manifest entries`);
         const prunedManifest = manifest.filter(id => !confirmedMissing.includes(id));
         updateManifest(prunedManifest, keys.manifestKey, keys.hmacSecret);  // fire and forget
     }

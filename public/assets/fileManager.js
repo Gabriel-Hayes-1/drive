@@ -82,6 +82,38 @@ export async function getFile(fileName, onProgress) {
     });
 }
 
+export async function getFileBatch(fileNames) {
+    const results = []
+    const batches = new Array(Math.ceil(fileNames.length/100));
+    for (let i=0, j=0; i < fileNames.length; i+=100, j++) {
+        batches[j] = fileNames.slice(i,i+100)
+    }
+    for (const batch of batches) {
+        try {
+            const response = await fetch("/api/file/batch",{ 
+                method:"POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/octet-stream"
+                },
+                body: JSON.stringify({files:batch})
+            });
+            if (!response.ok) {
+                const resJson = await response.json();
+                const message = resJson.message || "Failed to get batch of files";
+                throw new Error(message)
+            } else {
+                results.push(await response.arrayBuffer())
+            }
+    
+        } catch (e) {
+            console.error("Error in batch call: ",e);
+            return false
+        }
+    }
+    return results
+}
+
 export async function deleteFileRaw(fileName) {
     try {
         const response = await fetch("/api/file/" + encodeURIComponent(fileName), { method: "DELETE" });

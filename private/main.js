@@ -330,6 +330,7 @@ createFolder.addEventListener("click", async () => {
 //file previews
 async function openPreviewFor(file) {
     if (file.type == "folder") return;
+    filePreview.querySelector("audio, video")?.pause()
     openFilePreview(file.name);
     if (isFileDisplayable(file)) {
         typeNotSupported.classList.add("hidden");
@@ -363,6 +364,7 @@ function createPreviewElement(type, url) {
         previewElement.controls = true;
     } else if (type.startsWith("text/")) {
         previewElement = document.createElement("iframe");
+        previewElement.sandbox=""
         previewElement.src = url;
     }
     return previewElement;
@@ -409,6 +411,7 @@ async function createBlobURL(file, isPreview) {
 }
 function closePreview() {
     previewWrapper.classList.add("transparent");
+    filePreview.querySelector("audio, video")?.pause()
     previewFileIndex = null;
 }
 previewClose.addEventListener("click",()=>{
